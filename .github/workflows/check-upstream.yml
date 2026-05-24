@@ -32,7 +32,7 @@ jobs:
           VERSION: ${{ steps.upstream.outputs.version }}
           OPENWRT_VERSION: "24.10.6"
         run: |
-          TAG="openwrt${OPENWRT_VERSION}-${VERSION}"
+          TAG="openwrt ${OPENWRT_VERSION}-${VERSION}"
           echo "Checking tag: ${TAG}"
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
             echo "skip=true" >> $GITHUB_OUTPUT
