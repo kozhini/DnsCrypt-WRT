@@ -19,22 +19,36 @@ define Package/dnscrypt-proxy2
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=IP Addresses and Names
-  TITLE:=DNSCrypt-proxy version 2
+  TITLE:=Flexible DNS proxy with encrypted DNS protocols
   URL:=https://github.com/DNSCrypt/dnscrypt-proxy
-  DEPENDS:=$(GO_ARCH_DEPENDS)
+  DEPENDS:=$(GO_ARCH_DEPENDS) +ca-bundle
+  CONFLICTS:=dnscrypt-proxy
 endef
 
 define Package/dnscrypt-proxy2/description
-  Flexible DNS proxy, with support for encrypted DNS protocols.
+  A flexible DNS proxy, with support for modern encrypted DNS protocols
+  such as DNSCrypt v2 and DNS-over-HTTPS.
+endef
+
+define Package/dnscrypt-proxy2/conffiles
+/etc/dnscrypt-proxy2/dnscrypt-proxy.toml
 endef
 
 define Package/dnscrypt-proxy2/install
 	$(call GoPackage/Package/Install/Bin,$(1))
-	$(INSTALL_DIR) $(1)/etc/dnscrypt-proxy
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml $(1)/etc/dnscrypt-proxy/dnscrypt-proxy.toml
+
+	$(INSTALL_DIR) $(1)/usr/sbin
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/* $(1)/usr/sbin/
+
+	$(INSTALL_DIR) $(1)/etc/dnscrypt-proxy2
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml $(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml
+	$(INSTALL_DATA) ./files/blocked-names.txt $(1)/etc/dnscrypt-proxy2/blocked-names.txt
+
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/dnscrypt-proxy.init $(1)/etc/init.d/dnscrypt-proxy
-	$(INSTALL_DATA) ./files/blocked-names.txt $(1)/etc/dnscrypt-proxy/blocked-names.txt
+
+	sed -i "s/^listen_addresses = .*/listen_addresses = ['127.0.0.53:53']/" $(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml
+	sed -i "s/^ # blocked_names_file = 'blocked-names.txt'/blocked_names_file = 'blocked-names.txt'/" $(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml
 endef
 
 $(eval $(call BuildPackage,dnscrypt-proxy2))
