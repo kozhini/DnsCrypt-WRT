@@ -73,7 +73,7 @@ jobs:
           VERSION: ${{ steps.upstream.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh workflow run build.yml \
+          gh workflow run Build.yaml \
             -f openwrt_version=24.10.6 \
             -f target=mediatek \
             -f subtarget=filogic \
