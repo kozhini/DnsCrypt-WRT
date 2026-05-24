@@ -188,7 +188,7 @@ jobs:
         run: |
           mkdir -p release
           find openwrt-sdk/bin/packages -name "dnscrypt-proxy2*.ipk" -exec cp {} release/ \;
-          TAG="openwrt${OPENWRT_VERSION}-${{ steps.pkg_version.outputs.version }}"
+          TAG="openwrt ${OPENWRT_VERSION}-${{ steps.pkg_version.outputs.version }}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Create Release
