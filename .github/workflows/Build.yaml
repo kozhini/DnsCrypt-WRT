@@ -1,0 +1,206 @@
+
+name: Build OpenWrt Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      openwrt_version:
+        description: "OpenWrt version"
+        required: true
+        default: "24.10.6"
+
+      target:
+        description: "Target"
+        required: true
+        default: "mediatek"
+
+      subtarget:
+        description: "Subtarget"
+        required: true
+        default: "filogic"
+
+      arch:
+        description: "Architecture"
+        required: true
+        default: "aarch64_cortex-a53"
+
+      go_version:
+        description: "Go version"
+        required: true
+        default: "1.25.5"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      OPENWRT_VERSION: ${{ inputs.openwrt_version }}
+      TARGET: ${{ inputs.target }}
+      SUBTARGET: ${{ inputs.subtarget }}
+      ARCH: ${{ inputs.arch }}
+      GO_VERSION: ${{ inputs.go_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Verify Go installation
+        run: |
+          go version
+          echo "GOROOT: $(go env GOROOT)"
+    
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk \
+            gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
+            python3-setuptools rsync swig unzip zlib1g-dev file wget zstd
+    
+      - name: Download OpenWrt SDK
+        run: |
+          SDK_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
+          echo "SDK_URL=${SDK_URL}"
+          wget -q "$SDK_URL" -O sdk.tar.zst
+          tar --zstd -xf sdk.tar.zst
+          mv openwrt-sdk-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}* openwrt-sdk
+     
+      - name: Update feeds (without installing conflicting packages)
+        working-directory: openwrt-sdk
+        run: |
+          ./scripts/feeds update -a
+          
+          echo "=== Installing feeds EXCEPT golang and dnscrypt-proxy2 ==="
+          ./scripts/feeds install -a -p packages -d y
+          ./scripts/feeds uninstall golang dnscrypt-proxy2
+          
+          echo "=== Removing conflicting packages from feeds ==="
+          rm -rf feeds/packages/lang/golang
+          rm -rf feeds/packages/net/dnscrypt-proxy2
+          
+          echo "=== Verify removal ==="
+          ls feeds/packages/lang/ | grep golang || echo "✓ golang removed"
+          ls feeds/packages/net/ | grep dnscrypt || echo "✓ dnscrypt-proxy2 removed"
+      
+      - name: Copy local source to SDK
+        run: |
+          echo "=== Copying local source ==="
+          mkdir -p openwrt-sdk/package/dnscrypt-proxy2
+          rsync -av --exclude=openwrt-sdk --exclude=.git --exclude=.github \
+            . openwrt-sdk/package/dnscrypt-proxy2/
+          
+          echo "=== Downloading missing files from upstream ==="
+          mkdir -p openwrt-sdk/package/dnscrypt-proxy2/files
+          
+          if [ ! -f openwrt-sdk/package/dnscrypt-proxy2/files/blocked-names.txt ]; then
+            curl -sL -o openwrt-sdk/package/dnscrypt-proxy2/files/blocked-names.txt \
+              https://raw.githubusercontent.com/openwrt/packages/master/net/dnscrypt-proxy2/files/blocked-names.txt
+          fi
+          
+          if [ ! -f openwrt-sdk/package/dnscrypt-proxy2/files/dnscrypt-proxy.init ]; then
+            curl -sL -o openwrt-sdk/package/dnscrypt-proxy2/files/dnscrypt-proxy.init \
+              https://raw.githubusercontent.com/openwrt/packages/master/net/dnscrypt-proxy2/files/dnscrypt-proxy.init
+            chmod +x openwrt-sdk/package/dnscrypt-proxy2/files/dnscrypt-proxy.init
+          fi
+          
+          echo "=== Verify files exist ==="
+          ls -la openwrt-sdk/package/dnscrypt-proxy2/files/
+          
+          echo "=== Creating minimal golang-package.mk ==="
+          cat > openwrt-sdk/package/dnscrypt-proxy2/golang-package.mk << 'EOFGOLANG'
+          # Minimal golang-package.mk using system Go
+          
+          export GOTOOLCHAIN := local
+          export GOROOT := $(shell go env GOROOT)
+          export GOPATH := $(BUILD_DIR)/gopath
+          export GOCACHE := $(BUILD_DIR)/go-cache
+          export PATH := $(GOROOT)/bin:$(PATH)
+          
+          GO_PKG_BUILD_BIN_DIR := $(PKG_INSTALL_DIR)/usr/bin
+          
+          define Build/Compile
+          	mkdir -p $(GO_PKG_BUILD_BIN_DIR)
+          	cd $(PKG_BUILD_DIR)/dnscrypt-proxy && \
+          	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+          	go build -v -trimpath -ldflags="-s -w" \
+          	-o $(GO_PKG_BUILD_BIN_DIR)/dnscrypt-proxy
+          endef
+          
+          define GoPackage/Package/Install/Bin
+          	$(INSTALL_DIR) $(1)/usr/bin
+          	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/* $(1)/usr/bin/ 2>/dev/null || true
+          endef
+          EOFGOLANG
+          
+          echo "=== Verify package version ==="
+          grep "PKG_VERSION" openwrt-sdk/package/dnscrypt-proxy2/Makefile
+      
+      - name: Configure package
+        working-directory: openwrt-sdk
+        run: |
+          echo "CONFIG_PACKAGE_dnscrypt-proxy2=m" > .config
+          make defconfig
+          
+          echo "=== Verify package is from local source ==="
+          make package/dnscrypt-proxy2/prepare V=s 2>&1 | grep -E "(PKG_VERSION|PKG_SOURCE)" | head -5
+      
+      - name: Compile package
+        working-directory: openwrt-sdk
+        env:
+          GOCACHE: ${{ github.workspace }}/.cache/go-build
+          GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
+          GOTOOLCHAIN: local
+        run: |
+          echo "=== Starting compilation ==="
+          make package/dnscrypt-proxy2/compile V=s -j$(nproc)
+     
+      - name: Find built packages
+        run: |
+          echo "=== All IPK files ==="
+          find openwrt-sdk/bin/packages -type f -name "*.ipk" -ls
+          
+          echo ""
+          echo "=== dnscrypt-proxy packages ==="
+          find openwrt-sdk/bin/packages -name "*dnscrypt*.ipk" -exec ls -lh {} \;
+      
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: dnscrypt-proxy2-${{ env.OPENWRT_VERSION }}-${{ env.ARCH }}
+          path: |
+            openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
+            openwrt-sdk/bin/packages/${{ env.ARCH }}/packages/dnscrypt-proxy2*.ipk
+          if-no-files-found: error
+
+      - name: Prepare release files
+        id: prepare_release
+        run: |
+          mkdir -p release
+          find openwrt-sdk/bin/packages -name "dnscrypt-proxy2*.ipk" -exec cp {} release/ \;
+          cd release
+          ls -1 *.ipk > ../files.txt
+          TAG="openwrt${OPENWRT_VERSION}-$(date +%Y%m%d)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.prepare_release.outputs.tag }}
+          name: "OpenWrt ${{ inputs.openwrt_version }} - dnscrypt-proxy2 2.1.16"
+          body: |
+            ## dnscrypt-proxy2 для OpenWrt ${{ inputs.openwrt_version }}
+            
+            **Архитектура:** ${{ inputs.arch }}
+            **Go версия:** ${{ inputs.go_version }}
+            **dnscrypt-proxy версия:** 2.1.16
+          files: release/*.ipk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          
