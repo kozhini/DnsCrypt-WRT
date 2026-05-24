@@ -31,6 +31,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write 
 
     env:
       OPENWRT_VERSION: ${{ inputs.openwrt_version }}
