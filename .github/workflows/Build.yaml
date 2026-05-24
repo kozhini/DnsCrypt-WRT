@@ -1,4 +1,3 @@
-
 name: Build OpenWrt Package
 
 on:
@@ -42,10 +41,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+
+      - name: Read package version from Makefile
+        id: pkg_version
+        run: |
+          VERSION=$(grep "^PKG_VERSION:=" Makefile | cut -d= -f2)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building dnscrypt-proxy2 version: ${VERSION}"
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
@@ -182,25 +188,20 @@ jobs:
         run: |
           mkdir -p release
           find openwrt-sdk/bin/packages -name "dnscrypt-proxy2*.ipk" -exec cp {} release/ \;
-          cd release
-          ls -1 *.ipk > ../files.txt
-          TAG="openwrt${OPENWRT_VERSION}-$(date +%Y%m%d)"
+          TAG="openwrt${OPENWRT_VERSION}-${{ steps.pkg_version.outputs.version }}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.prepare_release.outputs.tag }}
-          name: "OpenWrt ${{ inputs.openwrt_version }} - dnscrypt-proxy2 2.1.16"
+          name: "OpenWrt ${{ inputs.openwrt_version }} - dnscrypt-proxy2 ${{ steps.pkg_version.outputs.version }}"
           body: |
             ## dnscrypt-proxy2 для OpenWrt ${{ inputs.openwrt_version }}
             
             **Архитектура:** ${{ inputs.arch }}
             **Go версия:** ${{ inputs.go_version }}
-            **dnscrypt-proxy версия:** 2.1.16
+            **dnscrypt-proxy версия:** ${{ steps.pkg_version.outputs.version }}
           files: release/*.ipk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-          
