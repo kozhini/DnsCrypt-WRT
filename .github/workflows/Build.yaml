@@ -77,7 +77,7 @@ jobs:
       - name: Copy package to SDK
         run: |
           mkdir -p openwrt-sdk/package/dnscrypt-proxy2
-          rsync -av --exclude='.git' --exclude='.github' ./ openwrt-sdk/package/dnscrypt-proxy2/
+          rsync -av package/dnscrypt-proxy2/ openwrt-sdk/package/dnscrypt-proxy2/
 
       - name: Configure package
         working-directory: openwrt-sdk
