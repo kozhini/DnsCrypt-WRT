@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read package version
         id: pkg_version
@@ -47,11 +47,12 @@ jobs:
           VERSION=$(grep '^PKG_VERSION:=' Makefile | cut -d= -f2)
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false
+           go-version: 1
+           check-latest: true
+           cache: false
 
       - name: Install dependencies
         run: |
