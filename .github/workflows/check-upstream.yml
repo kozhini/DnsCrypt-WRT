@@ -77,5 +77,4 @@ jobs:
             -f openwrt_version=24.10.6 \
             -f target=mediatek \
             -f subtarget=filogic \
-            -f arch=aarch64_cortex-a53 \
-            -f go_version=1.25.5
+            -f arch=aarch64_cortex-a53
