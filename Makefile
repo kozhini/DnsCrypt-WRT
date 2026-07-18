@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=dnscrypt-proxy2
-PKG_VERSION:=2.1.17
+PKG_VERSION:=2.1.18
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/DNSCrypt/dnscrypt-proxy.git
-PKG_SOURCE_VERSION:=2.1.17
+PKG_SOURCE_VERSION:=2.1.18
 PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=Forced Build
