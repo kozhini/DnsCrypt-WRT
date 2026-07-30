@@ -13,7 +13,7 @@ PKG_MAINTAINER:=Forced Build
 PKG_LICENSE:=ISC
 
 include $(INCLUDE_DIR)/package.mk
-include golang-package.mk
+include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
 
 define Package/dnscrypt-proxy2
   SECTION:=net
