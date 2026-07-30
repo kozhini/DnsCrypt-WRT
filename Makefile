@@ -11,6 +11,7 @@ PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=Forced Build
 PKG_LICENSE:=ISC
+GO_PKG_BUILD_VARS += CGO_ENABLED=0
 
 include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
