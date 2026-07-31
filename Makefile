@@ -28,6 +28,14 @@ define Package/dnscrypt-proxy2
   CONFLICTS:=dnscrypt-proxy
 endef
 
+define Build/Compile
+	cd $(PKG_BUILD_DIR)/dnscrypt-proxy && \
+	CGO_ENABLED=0 \
+	$(GO_GENERAL_BUILD_CONFIG_VARS) \
+	$(GO_PKG_BUILD_VARS) \
+	go build -trimpath -ldflags="-s -w" -o dnscrypt-proxy .
+endef
+
 define Package/dnscrypt-proxy2/description
   A flexible DNS proxy, with support for modern encrypted DNS protocols
   such as DNSCrypt v2 and DNS-over-HTTPS.
