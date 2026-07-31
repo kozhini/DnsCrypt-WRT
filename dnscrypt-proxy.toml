@@ -1,32 +1,27 @@
 ##############################################
-#  Актуализированная конфигурация для        #
 #  dnscrypt-proxy 2.1.18                     #
-#  Анонимность + обход цензуры/DPI           #
+#  GL.iNet GL-MT6000 (OpenWrt)               #
+#  Анонимность + DPI/цензура                 #
 ##############################################
 
 ###############################################################################
 #                             Global settings                                  #
 ###############################################################################
 
-## ODoH — максимальная анонимность (relay не видит содержимое, сервер не видит IP)
-## DNSCrypt — отказоустойчивость при недоступности ODoH
-## УБРАНЫ odoh-id-gmail и odoh-tiarap.org — они фильтруют контент,
-## что конфликтует с require_nofilter = true
-
 server_names = [
-  # ODoH серверы (без фильтрации, no logs)
+  # ODoH — максимальная анонимность (no logs, no filter)
   'odoh-crypto-sx',
   'odoh-cloudflare',
   'odoh-snowstorm',
   
-  # dnscry.pt ODoH — географическое разнообразие, без фильтрации
+  # dnscry.pt ODoH — географическое разнообразие
   'dnscry.pt-odoh-zurich',
   'dnscry.pt-odoh-amsterdam',
   'dnscry.pt-odoh-stockholm',
   'dnscry.pt-odoh-singapore',
   'dnscry.pt-odoh-hongkong',
   
-  # DNSCrypt fallback (без логов, вне "14 eyes" по возможности)
+  # DNSCrypt fallback (no logs, no filter)
   'dnscry.pt-amsterdam-ipv4',
   'dnscry.pt-frankfurt-ipv4',
   'scaleway-fr'
@@ -34,6 +29,9 @@ server_names = [
 
 listen_addresses = ['127.0.0.10:53']
 max_clients = 250
+
+# PID-файл для корректной работы OpenWrt init-скриптов
+pid_file = '/var/run/dnscrypt-proxy.pid'
 
 ###############################################################################
 #                            Server Selection                                  #
@@ -55,19 +53,23 @@ disabled_server_names = []
 #                           Connection Settings                                #
 ###############################################################################
 
-## Если DPI блокирует UDP — раскомментируйте:
+## Если DPI/провайдер блокирует UDP — раскомментируйте:
 # force_tcp = true
 # proxy = 'socks5://127.0.0.1:9050'
 
 force_tcp = false
+
+## HTTP/3 (QUIC) — усложняет DPI-анализ, трафик похож на обычный Google/Cloudflare
 http3 = true
+## Не пробовать HTTP/3 для серверов без Alt-Svc (избегаем таймаутов)
 http3_probe = false
 
 timeout = 8000
 keepalive = 30
 
-## Шифронаборы TLS, маскирующие под обычный HTTPS
-tls_cipher_suite = [52392, 49199]
+## EDNS Client Subnet — НЕ ТРОГАТЬ. 
+## Раскомментирование этой опции сломает анонимность, передав резолверу вашу подсеть.
+# edns_client_subnet = ['0.0.0.0/0', '2001:db8::/32']
 
 ###############################################################################
 #                        Load Balancing & Performance                          #
@@ -80,11 +82,13 @@ lb_estimator = true
 #                                Logging                                       #
 ###############################################################################
 
-log_level = 3
+log_level = 2
 
-# query_log отключён для приватности
-# [query_log]
-# file = 'query.log'
+## В OpenWrt пишем ТОЛЬКО в syslog (logread). 
+## Лог-файл закомментирован, чтобы не убивать flash/RAM.
+# log_file = '/var/log/dnscrypt-proxy.log'
+
+use_syslog = true
 
 log_files_max_size = 10
 log_files_max_age = 7
@@ -97,7 +101,10 @@ log_files_max_backups = 1
 cert_refresh_delay = 240
 cert_ignore_timestamp = false
 
+## Новый ключ для каждого DNSCrypt-запроса (нагрузка на CPU приемлема для MT7986A)
 dnscrypt_ephemeral_keys = true
+
+## Отключаем TLS session tickets — предотвращает корреляцию сессий по ticket
 tls_disable_session_tickets = true
 
 ###############################################################################
@@ -111,7 +118,9 @@ bootstrap_resolvers = [
 ]
 
 ignore_system_dns = true
-netprobe_timeout = 120
+
+## 60 сек достаточно для OpenWrt; 120 слишком долго при переподключении WAN
+netprobe_timeout = 60
 netprobe_address = '9.9.9.9:53'
 
 ###############################################################################
@@ -122,6 +131,9 @@ block_ipv6 = false
 block_unqualified = true
 block_undelegated = true
 reject_ttl = 10
+
+## Если бы включали блокировку — возвращать REFUSED вместо HINFO (ломает меньше клиентов)
+blocked_query_response = 'refused'
 
 ###############################################################################
 #                                DNS Cache                                     #
@@ -190,30 +202,29 @@ prefix = ''
 
 [anonymized_dns]
 
-## Теперь ДВА ODoH relay:
-## - odohrelay-crypto-sx (Fastly Compute)
-## - odohrelay-numa (Hetzner, Германия)
-## Распределяем нагрузку между ними для резервирования
+## ODoH relay НЕ могут использоваться с DNSCrypt-серверами.
+## DNSCrypt relay НЕ могут использоваться с ODoH-серверами.
+## Разделяем маршруты по протоколам.
 
 routes = [
-  # ODoH через оба relay (приоритетный — первый, fallback — второй)
+  # ODoH через оба relay (round-robin приоритет)
   { server_name='odoh-cloudflare', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
   { server_name='odoh-crypto-sx', via=['odohrelay-numa', 'odohrelay-crypto-sx'] },
   { server_name='odoh-snowstorm', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
   
-  # dnscry.pt ODoH — через оба relay
+  # dnscry.pt ODoH
   { server_name='dnscry.pt-odoh-zurich', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
   { server_name='dnscry.pt-odoh-amsterdam', via=['odohrelay-numa', 'odohrelay-crypto-sx'] },
   { server_name='dnscry.pt-odoh-stockholm', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
   { server_name='dnscry.pt-odoh-singapore', via=['odohrelay-numa', 'odohrelay-crypto-sx'] },
   { server_name='dnscry.pt-odoh-hongkong', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
   
-  # DNSCrypt через географически близкие anonymized relay
+  # DNSCrypt через anonymized relay (географически близкие)
   { server_name='dnscry.pt-amsterdam-ipv4', via=['anon-cs-nl', 'anon-cs-de'] },
   { server_name='dnscry.pt-frankfurt-ipv4', via=['anon-cs-de', 'anon-cs-ch'] },
   { server_name='scaleway-fr', via=['anon-scaleway', 'anon-cs-fr'] },
   
-  # Fallback: авто-подбор relay для остальных серверов
+  # Fallback (неактивен при явном server_names, но оставлен для совместимости)
   { server_name='*', via=['*'] }
 ]
 
