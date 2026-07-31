@@ -42,15 +42,29 @@ jobs:
             echo "Tag ${TAG} not found, build needed"
           fi
 
+      - name: Compute new PKG_HASH
+        if: steps.check_tag.outputs.skip == 'false'
+        id: hash
+        env:
+          VERSION: ${{ steps.upstream.outputs.version }}
+        run: |
+          URL="https://codeload.github.com/DNSCrypt/dnscrypt-proxy/tar.gz/${VERSION}"
+          echo "Downloading tarball: ${URL}"
+          curl -sL "$URL" -o dnscrypt-proxy.tar.gz
+          HASH=$(sha256sum dnscrypt-proxy.tar.gz | cut -d' ' -f1)
+          echo "hash=${HASH}" >> $GITHUB_OUTPUT
+          echo "SHA256: ${HASH}"
+
       - name: Update Makefile
         if: steps.check_tag.outputs.skip == 'false'
         env:
           VERSION: ${{ steps.upstream.outputs.version }}
+          HASH: ${{ steps.hash.outputs.hash }}
         run: |
           sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${VERSION}/" Makefile
-          sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=${VERSION}/" Makefile
+          sed -i "s/^PKG_HASH:=.*/PKG_HASH:=${HASH}/" Makefile
           echo "=== Verify ==="
-          grep -E "^PKG_VERSION|^PKG_SOURCE_VERSION" Makefile
+          grep -E "^PKG_VERSION|^PKG_HASH" Makefile
 
       - name: Commit updated Makefile
         if: steps.check_tag.outputs.skip == 'false'
@@ -70,7 +84,6 @@ jobs:
       - name: Trigger build
         if: steps.check_tag.outputs.skip == 'false'
         env:
-          VERSION: ${{ steps.upstream.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run Build.yaml \
@@ -78,3 +91,4 @@ jobs:
             -f target=mediatek \
             -f subtarget=filogic \
             -f arch=aarch64_cortex-a53
+
