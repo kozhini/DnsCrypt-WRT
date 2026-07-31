@@ -54,4 +54,10 @@ define Package/dnscrypt-proxy2/install
 	sed -i "s/^ # blocked_names_file = 'blocked-names.txt'/blocked_names_file = 'blocked-names.txt'/" $(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml
 endef
 
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	sed -i 's/go build/CGO_ENABLED=0 CC="" CXX="" go build/g' \
+		$(PKG_BUILD_DIR)/Makefile
+endef
+
 $(eval $(call BuildPackage,dnscrypt-proxy2))
