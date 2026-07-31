@@ -1,0 +1,240 @@
+##############################################
+#  Актуализированная конфигурация для        #
+#  dnscrypt-proxy 2.1.18                     #
+#  Анонимность + обход цензуры/DPI           #
+##############################################
+
+###############################################################################
+#                             Global settings                                  #
+###############################################################################
+
+## ODoH — максимальная анонимность (relay не видит содержимое, сервер не видит IP)
+## DNSCrypt — отказоустойчивость при недоступности ODoH
+## УБРАНЫ odoh-id-gmail и odoh-tiarap.org — они фильтруют контент,
+## что конфликтует с require_nofilter = true
+
+server_names = [
+  # ODoH серверы (без фильтрации, no logs)
+  'odoh-crypto-sx',
+  'odoh-cloudflare',
+  'odoh-snowstorm',
+  
+  # dnscry.pt ODoH — географическое разнообразие, без фильтрации
+  'dnscry.pt-odoh-zurich',
+  'dnscry.pt-odoh-amsterdam',
+  'dnscry.pt-odoh-stockholm',
+  'dnscry.pt-odoh-singapore',
+  'dnscry.pt-odoh-hongkong',
+  
+  # DNSCrypt fallback (без логов, вне "14 eyes" по возможности)
+  'dnscry.pt-amsterdam-ipv4',
+  'dnscry.pt-frankfurt-ipv4',
+  'scaleway-fr'
+]
+
+listen_addresses = ['127.0.0.10:53']
+max_clients = 250
+
+###############################################################################
+#                            Server Selection                                  #
+###############################################################################
+
+ipv4_servers = true
+ipv6_servers = false
+
+dnscrypt_servers = true
+doh_servers = true
+odoh_servers = true
+
+require_dnssec = false
+require_nolog = true
+require_nofilter = true
+disabled_server_names = []
+
+###############################################################################
+#                           Connection Settings                                #
+###############################################################################
+
+## Если DPI блокирует UDP — раскомментируйте:
+# force_tcp = true
+# proxy = 'socks5://127.0.0.1:9050'
+
+force_tcp = false
+http3 = true
+http3_probe = false
+
+timeout = 8000
+keepalive = 30
+
+## Шифронаборы TLS, маскирующие под обычный HTTPS
+tls_cipher_suite = [52392, 49199]
+
+###############################################################################
+#                        Load Balancing & Performance                          #
+###############################################################################
+
+lb_strategy = 'wp2'
+lb_estimator = true
+
+###############################################################################
+#                                Logging                                       #
+###############################################################################
+
+log_level = 3
+
+# query_log отключён для приватности
+# [query_log]
+# file = 'query.log'
+
+log_files_max_size = 10
+log_files_max_age = 7
+log_files_max_backups = 1
+
+###############################################################################
+#                           Certificate Management                             #
+###############################################################################
+
+cert_refresh_delay = 240
+cert_ignore_timestamp = false
+
+dnscrypt_ephemeral_keys = true
+tls_disable_session_tickets = true
+
+###############################################################################
+#                            Startup & Network                                 #
+###############################################################################
+
+bootstrap_resolvers = [
+  '1.1.1.1:53',
+  '9.9.9.9:53',
+  '149.112.112.112:53'
+]
+
+ignore_system_dns = true
+netprobe_timeout = 120
+netprobe_address = '9.9.9.9:53'
+
+###############################################################################
+#                                 Filters                                      #
+###############################################################################
+
+block_ipv6 = false
+block_unqualified = true
+block_undelegated = true
+reject_ttl = 10
+
+###############################################################################
+#                                DNS Cache                                     #
+###############################################################################
+
+cache = true
+cache_size = 8192
+cache_min_ttl = 3600
+cache_max_ttl = 172800
+cache_neg_min_ttl = 60
+cache_neg_max_ttl = 600
+
+###############################################################################
+#                                 Servers                                      #
+###############################################################################
+
+[sources]
+
+[sources.'public-resolvers']
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md',
+  'https://cdn.jsdelivr.net/gh/DNSCrypt/dnscrypt-resolvers@master/v3/public-resolvers.md',
+]
+cache_file = 'public-resolvers.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 73
+prefix = ''
+
+[sources.'relays']
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/relays.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/relays.md',
+  'https://cdn.jsdelivr.net/gh/DNSCrypt/dnscrypt-resolvers@master/v3/relays.md',
+]
+cache_file = 'relays.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 73
+prefix = ''
+
+[sources.'odoh-servers']
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-servers.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/odoh-servers.md',
+  'https://cdn.jsdelivr.net/gh/DNSCrypt/dnscrypt-resolvers@master/v3/odoh-servers.md',
+]
+cache_file = 'odoh-servers.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 73
+prefix = ''
+
+[sources.'odoh-relays']
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-relays.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/odoh-relays.md',
+  'https://cdn.jsdelivr.net/gh/DNSCrypt/dnscrypt-resolvers@master/v3/odoh-relays.md',
+]
+cache_file = 'odoh-relays.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 73
+prefix = ''
+
+###############################################################################
+#                          Anonymized DNS                                      #
+###############################################################################
+
+[anonymized_dns]
+
+## Теперь ДВА ODoH relay:
+## - odohrelay-crypto-sx (Fastly Compute)
+## - odohrelay-numa (Hetzner, Германия)
+## Распределяем нагрузку между ними для резервирования
+
+routes = [
+  # ODoH через оба relay (приоритетный — первый, fallback — второй)
+  { server_name='odoh-cloudflare', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
+  { server_name='odoh-crypto-sx', via=['odohrelay-numa', 'odohrelay-crypto-sx'] },
+  { server_name='odoh-snowstorm', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
+  
+  # dnscry.pt ODoH — через оба relay
+  { server_name='dnscry.pt-odoh-zurich', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
+  { server_name='dnscry.pt-odoh-amsterdam', via=['odohrelay-numa', 'odohrelay-crypto-sx'] },
+  { server_name='dnscry.pt-odoh-stockholm', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
+  { server_name='dnscry.pt-odoh-singapore', via=['odohrelay-numa', 'odohrelay-crypto-sx'] },
+  { server_name='dnscry.pt-odoh-hongkong', via=['odohrelay-crypto-sx', 'odohrelay-numa'] },
+  
+  # DNSCrypt через географически близкие anonymized relay
+  { server_name='dnscry.pt-amsterdam-ipv4', via=['anon-cs-nl', 'anon-cs-de'] },
+  { server_name='dnscry.pt-frankfurt-ipv4', via=['anon-cs-de', 'anon-cs-ch'] },
+  { server_name='scaleway-fr', via=['anon-scaleway', 'anon-cs-fr'] },
+  
+  # Fallback: авто-подбор relay для остальных серверов
+  { server_name='*', via=['*'] }
+]
+
+skip_incompatible = true
+
+###############################################################################
+#                        Servers with known bugs                               #
+###############################################################################
+
+[broken_implementations]
+
+fragments_blocked = [
+  'cisco',
+  'cisco-ipv6',
+  'cisco-familyshield',
+  'cisco-familyshield-ipv6',
+  'cisco-sandbox',
+  'cleanbrowsing-adult',
+  'cleanbrowsing-adult-ipv6',
+  'cleanbrowsing-family',
+  'cleanbrowsing-family-ipv6',
+  'cleanbrowsing-security',
+  'cleanbrowsing-security-ipv6',
+]
