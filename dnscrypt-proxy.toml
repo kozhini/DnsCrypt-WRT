@@ -61,7 +61,7 @@ http3 = true
 ## Не пробовать HTTP/3 для серверов без Alt-Svc (избегаем таймаутов)
 http3_probe = false
 
-timeout = 8000
+timeout = 5000
 keepalive = 30
 
 ## EDNS Client Subnet — НЕ ТРОГАТЬ. 
@@ -137,7 +137,7 @@ blocked_query_response = 'refused'
 ###############################################################################
 
 cache = true
-cache_size = 8192
+cache_size = 32768
 cache_min_ttl = 3600
 cache_max_ttl = 172800
 cache_neg_min_ttl = 60
