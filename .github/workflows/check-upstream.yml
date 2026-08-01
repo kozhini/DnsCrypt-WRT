@@ -91,4 +91,3 @@ jobs:
             -f target=mediatek \
             -f subtarget=filogic \
             -f arch=aarch64_cortex-a53
-
